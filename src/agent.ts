@@ -22,8 +22,11 @@ export class CopilotAgentSessionRunner implements AgentSessionRunner {
       if (!content) throw new Error("Copilot session returned no assistant content");
       return content;
     } finally {
-      if (session) await session.disconnect();
-      await client.stop();
+      try {
+        if (session) await session.disconnect();
+      } finally {
+        await client.stop();
+      }
     }
   }
 }
