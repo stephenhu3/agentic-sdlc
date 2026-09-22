@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ArtifactMetadata, PlanDocument, WorkflowState } from "./contracts.js";
 
 export const planFrontMatterSchema = z.object({
-  artifactId: z.string().min(1),
+  artifactId: z.string().uuid(),
   requirement: z.string().min(1),
   createdAt: z.string().datetime(),
   contentHash: z.string().regex(/^[a-f0-9]{64}$/),
