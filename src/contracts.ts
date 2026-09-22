@@ -1,3 +1,8 @@
+/**
+ * Shared domain contracts for the SDLC workflow.
+ * These interfaces describe the plan document, persisted artifact metadata, and state transitions
+ * used by the planner and store layers.
+ */
 export type WorkflowStatus = "awaiting_approval" | "approved";
 
 export interface PlanFrontMatter {

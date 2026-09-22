@@ -1,3 +1,8 @@
+/**
+ * Handles durable plan persistence under the local .sdlc workspace.
+ * It serializes plan documents into artifact files and writes workflow state atomically so
+ * generated plans can be safely read back without partial writes.
+ */
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";

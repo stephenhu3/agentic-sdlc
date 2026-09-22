@@ -1,3 +1,8 @@
+/**
+ * Provides a runner implementation backed by the GitHub Copilot SDK.
+ * It creates a local session, sends the prompt, and ensures the underlying client is stopped
+ * even if session teardown fails while the plan is being generated.
+ */
 import { CopilotClient, type CopilotSession } from "@github/copilot-sdk";
 import type { AgentSessionRunner } from "./contracts.js";
 

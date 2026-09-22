@@ -1,3 +1,8 @@
+/**
+ * Coordinates the human-to-plan workflow.
+ * The planner requests a markdown plan from the agent, validates the returned front matter,
+ * canonicalizes the body hash, and then persists the plan for approval before the workflow advances.
+ */
 import { randomUUID } from "node:crypto";
 import type { AgentSessionRunner, PlanDocument, WorkflowState } from "./contracts.js";
 import { sha256 } from "./hash.js";

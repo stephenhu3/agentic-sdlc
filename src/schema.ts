@@ -1,3 +1,8 @@
+/**
+ * Validates persisted plan and workflow payloads with Zod.
+ * These schemas ensure artifact IDs, timestamps, hashes, and workflow transitions remain
+ * consistent across the planner and storage layers.
+ */
 import { z } from "zod";
 import type { ArtifactMetadata, PlanDocument, WorkflowState } from "./contracts.js";
 
