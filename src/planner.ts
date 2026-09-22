@@ -29,7 +29,6 @@ export class Planner {
         `artifactId: ${JSON.stringify(artifactId)}`,
         `requirement: ${JSON.stringify(normalizedRequirement)}`,
         `createdAt: ${JSON.stringify(createdAt)}`,
-        "contentHash: <sha256 of the markdown body>",
         "Then include a concise actionable plan body.",
       ].join("\n"),
       process.cwd(),
@@ -38,10 +37,15 @@ export class Planner {
     if (parsed.frontMatter.artifactId !== artifactId || parsed.frontMatter.requirement !== normalizedRequirement) {
       throw new Error("Planner response front matter does not match the requested requirement");
     }
-    if (parsed.frontMatter.contentHash !== sha256(parsed.body.trim())) {
-      throw new Error("Planner response content hash does not match the plan body");
-    }
-    const metadata = await this.store.writePlan(parsed);
+    const canonicalPlan: PlanDocument = {
+      ...parsed,
+      body: parsed.body.trim(),
+      frontMatter: {
+        ...parsed.frontMatter,
+        contentHash: sha256(parsed.body.trim()),
+      },
+    };
+    const metadata = await this.store.writePlan(canonicalPlan);
     const state: WorkflowState = {
       workflowId: randomUUID(),
       status: "awaiting_approval",
@@ -49,7 +53,7 @@ export class Planner {
       updatedAt: this.now().toISOString(),
     };
     await this.store.writeWorkflowState(state);
-    return { artifactId: metadata.artifactId, status: "awaiting_approval", plan: parsed, state };
+    return { artifactId: metadata.artifactId, status: "awaiting_approval", plan: canonicalPlan, state };
   }
 
   public async approvePlan(): Promise<WorkflowState> {
