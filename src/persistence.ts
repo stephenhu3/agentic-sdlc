@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ArtifactMetadata, PlanDocument, WorkflowState } from "./contracts.js";
@@ -5,7 +6,7 @@ import { artifactMetadataSchema, planDocumentSchema, workflowStateSchema } from 
 
 async function atomicWrite(path: string, content: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+  const temporaryPath = `${path}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(temporaryPath, content, "utf8");
   await rename(temporaryPath, path);
 }
