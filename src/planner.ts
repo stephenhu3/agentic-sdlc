@@ -131,6 +131,9 @@ export class Planner {
   }
 
   public async createPlan(requirement: string): Promise<PlannerResult> {
+    if (await this.store.readWorkflowState()) {
+      throw new Error("A workflow already exists in this workspace");
+    }
     const workflowId = randomUUID();
     const createdAt = this.now().toISOString();
     const prompt: PromptRecord = {
@@ -138,7 +141,6 @@ export class Planner {
       content: requirement.trim(),
       createdAt,
     };
-    await this.store.appendPrompt(prompt);
     const plan = await this.generatePlanRevision({
       workflowId,
       iteration: 1,
@@ -161,7 +163,7 @@ export class Planner {
       lastPromptSequence: 1,
       updatedAt: createdAt,
     };
-    await this.store.writeWorkflowState(state, undefined, {
+    await this.store.createWorkflow(state, prompt, {
       createdAt,
       workflowId,
       stage: state.stage,

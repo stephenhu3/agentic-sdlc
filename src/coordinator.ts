@@ -64,14 +64,13 @@ export class WorkflowCoordinator {
       createdAt,
     };
     const nextState = this.nextState(state, { lastPromptSequence: prompt.sequence });
-    await this.store.writeWorkflowState(nextState, state.version, {
+    await this.store.appendPromptAndUpdateWorkflowState(prompt, nextState, state.version, {
       createdAt,
       workflowId: nextState.workflowId,
       stage: nextState.stage,
       type: "prompt.appended",
       sequence: prompt.sequence,
     });
-    await this.store.appendPrompt(prompt);
     const activePlan = nextState.activePlanRevision;
     if (activePlan) {
       await this.store.projectCurrentPlan(await this.store.readPlanRevision(activePlan.artifactId), await this.store.listPrompts());

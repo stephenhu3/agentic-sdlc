@@ -105,11 +105,55 @@ export class SdlcStore {
     };
   }
 
-  public async appendPrompt(prompt: PromptRecord): Promise<void> {
+  private promptPath(sequence: number): string {
+    return join(this.rootDirectory, ".sdlc", "prompts", `${String(sequence).padStart(4, "0")}-prompt.json`);
+  }
+
+  private async appendPromptUnlocked(prompt: PromptRecord): Promise<void> {
     await atomicWrite(
-      join(this.rootDirectory, ".sdlc", "prompts", `${String(prompt.sequence).padStart(4, "0")}-prompt.json`),
+      this.promptPath(prompt.sequence),
       `${stableSerialize(promptRecordSchema.parse(prompt))}\n`,
     );
+  }
+
+  public async createWorkflow(
+    state: WorkflowState,
+    initialPrompt: PromptRecord,
+    event?: Record<string, unknown>,
+  ): Promise<void> {
+    const nextState = workflowStateSchema.parse(state);
+    await this.withWorkflowLock(async () => {
+      const current = await this.readWorkflowState();
+      if (current) {
+        throw new Error("A workflow already exists in this workspace");
+      }
+      await this.appendPromptUnlocked(initialPrompt);
+      await atomicWrite(join(this.rootDirectory, ".sdlc", "workflow.json"), `${stableSerialize(nextState)}\n`);
+      if (event) {
+        await this.appendEventUnlocked(event);
+      }
+    });
+  }
+
+  public async appendPromptAndUpdateWorkflowState(
+    prompt: PromptRecord,
+    state: WorkflowState,
+    expectedVersion: number,
+    event?: Record<string, unknown>,
+  ): Promise<void> {
+    const nextState = workflowStateSchema.parse(state);
+    await this.withWorkflowLock(async () => {
+      const current = await this.readWorkflowState();
+      if (!current) throw new Error("Workflow state does not exist");
+      if (current.version !== expectedVersion) {
+        throw new Error(`Workflow state version mismatch: expected ${expectedVersion}, received ${current.version}`);
+      }
+      await this.appendPromptUnlocked(prompt);
+      await atomicWrite(join(this.rootDirectory, ".sdlc", "workflow.json"), `${stableSerialize(nextState)}\n`);
+      if (event) {
+        await this.appendEventUnlocked(event);
+      }
+    });
   }
 
   public async listPrompts(): Promise<PromptRecord[]> {
@@ -415,12 +459,6 @@ export class SdlcStore {
     return artifactEnvelopeSchema(iterationReportSchema).parse(
       await readJson(join(this.rootDirectory, ".sdlc", "iterations", String(iteration), `ITERATION-${iteration}.json`)),
     );
-  }
-
-  public async appendEvent(event: Record<string, unknown>): Promise<void> {
-    await this.withWorkflowLock(async () => {
-      await this.appendEventUnlocked(event);
-    });
   }
 
   private async appendEventUnlocked(event: Record<string, unknown>): Promise<void> {
