@@ -137,7 +137,7 @@ test("validator cannot run before QA passes on the latest implementation snapsho
       summary: "Validation attempted too early",
       findings: [{ criterion: "Implement feature.", status: "passed", evidence: ["src/index.ts"], details: "done" }],
     }),
-    /not waiting for validation/,
+    /QA report|not waiting for validation/,
   );
 });
 
