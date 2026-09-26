@@ -46,7 +46,7 @@ The runtime persists artifacts under `.sdlc/`:
 ```text
 .sdlc/
   workflow.json
-  events.jsonl
+  events/<timestamp>-<event-id>.json
   PLAN.html
   plan/revisions/<revision-id>/
     artifact.json

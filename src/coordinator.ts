@@ -248,7 +248,8 @@ export class WorkflowCoordinator {
           : "awaiting_plan_revision_approval";
     const nextState = this.nextState(state, {
       stage: nextStage,
-      latestHumanDecision: this.artifactReference(artifact),
+      latestHumanDecision: input.route === "accept_and_document" ? this.artifactReference(artifact) : undefined,
+      latestValidationReport: input.route === "fix_implementation" ? undefined : state.latestValidationReport,
     });
     await this.store.writeWorkflowState(nextState, state.version, {
       createdAt: nextState.updatedAt,

@@ -4,6 +4,7 @@
  * so stale reports and approvals can be detected before they are applied.
  */
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import type {
   ArtifactEnvelope,
@@ -462,9 +463,8 @@ export class SdlcStore {
   }
 
   private async appendEventUnlocked(event: Record<string, unknown>): Promise<void> {
-    const path = join(this.rootDirectory, ".sdlc", "events.jsonl");
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, `${stableSerialize(event)}\n`, { encoding: "utf8", flag: "a" });
+    const path = join(this.rootDirectory, ".sdlc", "events", `${Date.now()}-${randomUUID()}.json`);
+    await atomicWrite(path, `${stableSerialize(event)}\n`);
   }
 
   public async writeWorkflowState(

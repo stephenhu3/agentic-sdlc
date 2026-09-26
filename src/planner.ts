@@ -51,6 +51,23 @@ function extractSectionList(body: string, heading: string): string[] {
   return values;
 }
 
+function extractTopLevelListItems(body: string): string[] {
+  const values: string[] = [];
+  let encounteredHeading = false;
+  for (const rawLine of body.split("\n")) {
+    const line = rawLine.trim();
+    if (/^#{1,6}\s+/.test(line)) {
+      if (encounteredHeading) break;
+      encounteredHeading = true;
+      continue;
+    }
+    if (/^([-*]|\d+\.)\s+/.test(line)) {
+      values.push(line.replace(/^([-*]|\d+\.)\s+/, "").trim());
+    }
+  }
+  return values;
+}
+
 function firstHeadingOrSentence(body: string): string {
   const line = body
     .split("\n")
@@ -107,7 +124,7 @@ export class Planner {
       openDesignDecisions: [],
     };
     if (planRevision.implementationTasks.length === 0) {
-      planRevision.implementationTasks = extractListItems(body);
+      planRevision.implementationTasks = extractTopLevelListItems(body);
     }
     return this.store.writePlanRevision({
       workflowId: input.workflowId,
