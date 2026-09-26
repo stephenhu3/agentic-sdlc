@@ -192,7 +192,15 @@ export class SdlcStore {
     data: ImplementationSnapshot;
   }): Promise<ArtifactEnvelope<ImplementationSnapshot>> {
     const data = implementationSnapshotSchema.parse(input.data);
-    const path = join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration), "implementation.json");
+    const directory = join(
+      this.rootDirectory,
+      ".sdlc",
+      "iterations",
+      String(input.iteration),
+      "implementations",
+      data.snapshotId,
+    );
+    const path = join(directory, "artifact.json");
     const artifact = artifactEnvelopeSchema(implementationSnapshotSchema).parse(
       this.artifactEnvelope(
         data.snapshotId,
@@ -208,6 +216,10 @@ export class SdlcStore {
       ),
     );
     await atomicWrite(path, `${stableSerialize(artifact)}\n`);
+    await atomicWrite(
+      join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration), "implementation.json"),
+      `${stableSerialize(artifact)}\n`,
+    );
     return artifact;
   }
 
@@ -215,6 +227,12 @@ export class SdlcStore {
     return artifactEnvelopeSchema(implementationSnapshotSchema).parse(
       await readJson(join(this.rootDirectory, ".sdlc", "iterations", String(iteration), "implementation.json")),
     );
+  }
+
+  public async readImplementationSnapshotByReference(
+    reference: ArtifactReference,
+  ): Promise<ArtifactEnvelope<ImplementationSnapshot>> {
+    return artifactEnvelopeSchema(implementationSnapshotSchema).parse(await readJson(reference.path));
   }
 
   public async writeQaReport(input: {
@@ -225,13 +243,14 @@ export class SdlcStore {
     data: QaReport;
   }): Promise<ArtifactEnvelope<QaReport>> {
     const data = qaReportSchema.parse(input.data);
-    const directory = join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration));
+    const directory = join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration), "qa", data.reportId);
+    const jsonPath = join(directory, "artifact.json");
     const htmlPath = join(directory, "QA.html");
     const artifact = artifactEnvelopeSchema(qaReportSchema).parse(
       this.artifactEnvelope(
         data.reportId,
         "qa-report",
-        htmlPath,
+        jsonPath,
         input.workflowId,
         input.iteration,
         "qa",
@@ -241,8 +260,11 @@ export class SdlcStore {
         input.createdAt,
       ),
     );
-    await atomicWrite(join(directory, "QA.json"), `${stableSerialize(artifact)}\n`);
+    await atomicWrite(jsonPath, `${stableSerialize(artifact)}\n`);
     await atomicWrite(htmlPath, renderQaHtml(artifact));
+    const currentDirectory = join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration));
+    await atomicWrite(join(currentDirectory, "QA.json"), `${stableSerialize(artifact)}\n`);
+    await atomicWrite(join(currentDirectory, "QA.html"), renderQaHtml(artifact));
     return artifact;
   }
 
@@ -250,6 +272,10 @@ export class SdlcStore {
     return artifactEnvelopeSchema(qaReportSchema).parse(
       await readJson(join(this.rootDirectory, ".sdlc", "iterations", String(iteration), "QA.json")),
     );
+  }
+
+  public async readQaReportByReference(reference: ArtifactReference): Promise<ArtifactEnvelope<QaReport>> {
+    return artifactEnvelopeSchema(qaReportSchema).parse(await readJson(reference.path));
   }
 
   public async writeValidationReport(input: {
@@ -260,13 +286,21 @@ export class SdlcStore {
     data: ValidationReport;
   }): Promise<ArtifactEnvelope<ValidationReport>> {
     const data = validationReportSchema.parse(input.data);
-    const directory = join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration));
+    const directory = join(
+      this.rootDirectory,
+      ".sdlc",
+      "iterations",
+      String(input.iteration),
+      "validation",
+      data.reportId,
+    );
+    const jsonPath = join(directory, "artifact.json");
     const htmlPath = join(directory, "VALIDATION.html");
     const artifact = artifactEnvelopeSchema(validationReportSchema).parse(
       this.artifactEnvelope(
         data.reportId,
         "validation-report",
-        htmlPath,
+        jsonPath,
         input.workflowId,
         input.iteration,
         "validator",
@@ -280,8 +314,11 @@ export class SdlcStore {
         input.createdAt,
       ),
     );
-    await atomicWrite(join(directory, "VALIDATION.json"), `${stableSerialize(artifact)}\n`);
+    await atomicWrite(jsonPath, `${stableSerialize(artifact)}\n`);
     await atomicWrite(htmlPath, renderValidationHtml(artifact));
+    const currentDirectory = join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration));
+    await atomicWrite(join(currentDirectory, "VALIDATION.json"), `${stableSerialize(artifact)}\n`);
+    await atomicWrite(join(currentDirectory, "VALIDATION.html"), renderValidationHtml(artifact));
     return artifact;
   }
 
@@ -291,6 +328,12 @@ export class SdlcStore {
     );
   }
 
+  public async readValidationReportByReference(
+    reference: ArtifactReference,
+  ): Promise<ArtifactEnvelope<ValidationReport>> {
+    return artifactEnvelopeSchema(validationReportSchema).parse(await readJson(reference.path));
+  }
+
   public async writeHumanDecision(input: {
     workflowId: string;
     iteration: number;
@@ -298,7 +341,15 @@ export class SdlcStore {
     data: HumanDecision;
   }): Promise<ArtifactEnvelope<HumanDecision>> {
     const data = humanDecisionSchema.parse(input.data);
-    const path = join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration), "decision.json");
+    const directory = join(
+      this.rootDirectory,
+      ".sdlc",
+      "iterations",
+      String(input.iteration),
+      "decisions",
+      data.decisionId,
+    );
+    const path = join(directory, "artifact.json");
     const artifact = artifactEnvelopeSchema(humanDecisionSchema).parse(
       this.artifactEnvelope(
         data.decisionId,
@@ -314,6 +365,10 @@ export class SdlcStore {
       ),
     );
     await atomicWrite(path, `${stableSerialize(artifact)}\n`);
+    await atomicWrite(
+      join(this.rootDirectory, ".sdlc", "iterations", String(input.iteration), "decision.json"),
+      `${stableSerialize(artifact)}\n`,
+    );
     return artifact;
   }
 
@@ -321,6 +376,10 @@ export class SdlcStore {
     return artifactEnvelopeSchema(humanDecisionSchema).parse(
       await readJson(join(this.rootDirectory, ".sdlc", "iterations", String(iteration), "decision.json")),
     );
+  }
+
+  public async readHumanDecisionByReference(reference: ArtifactReference): Promise<ArtifactEnvelope<HumanDecision>> {
+    return artifactEnvelopeSchema(humanDecisionSchema).parse(await readJson(reference.path));
   }
 
   public async writeIterationReport(input: {

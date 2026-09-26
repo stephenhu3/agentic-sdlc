@@ -151,7 +151,7 @@ export class WorkflowCoordinator {
       throw new Error("Validation requires an approved plan, implementation snapshot, and QA report");
     }
     if (state.stage !== "validation") throw new Error("Workflow is not waiting for validation");
-    const qaArtifact = await this.store.readQaReport(state.iteration);
+    const qaArtifact = await this.store.readQaReportByReference(state.latestQaReport);
     if (qaArtifact.data.outcome !== "passed") throw new Error("Validator cannot run before QA passes on the latest snapshot");
     if (
       qaArtifact.data.snapshotId !== state.currentImplementation.artifactId ||
@@ -288,10 +288,10 @@ export class WorkflowCoordinator {
     if (state.stage !== "documenting") throw new Error("Workflow is not ready to document the iteration");
     const prompts = await this.store.listPrompts();
     const plan = await this.store.readPlanRevision(state.activePlanRevision.artifactId);
-    const implementation = await this.store.readImplementationSnapshot(state.iteration);
-    const qa = await this.store.readQaReport(state.iteration);
-    const validation = await this.store.readValidationReport(state.iteration);
-    const decision = await this.store.readHumanDecision(state.iteration);
+    const implementation = await this.store.readImplementationSnapshotByReference(state.currentImplementation);
+    const qa = await this.store.readQaReportByReference(state.latestQaReport);
+    const validation = await this.store.readValidationReportByReference(state.latestValidationReport);
+    const decision = await this.store.readHumanDecisionByReference(state.latestHumanDecision);
     this.assertMatchesReference(state.activePlanRevision, plan, "Plan revision");
     this.assertMatchesReference(state.currentImplementation, implementation, "Implementation snapshot");
     this.assertMatchesReference(state.latestQaReport, qa, "QA report");
