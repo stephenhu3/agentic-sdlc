@@ -1,29 +1,50 @@
 import { mkdtemp, readFile } from "node:fs/promises";
+import { strict as assert } from "node:assert";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { Planner } from "../src/planner.js";
-import { SdlcStore } from "../src/persistence.js";
-import { sha256 } from "../src/hash.js";
 import type { AgentSessionRunner } from "../src/contracts.js";
+import { SdlcStore } from "../src/persistence.js";
+import { Planner } from "../src/planner.js";
 
-test("planner persists a hashed plan and pauses for approval", async () => {
+test("planner persists a pending plan revision and binds approval to the exact hash", async () => {
   const root = await mkdtemp(join(tmpdir(), "agentic-sdlc-"));
   const requirement = "Add an export endpoint";
-  const body = "# Plan\n\n1. Add the endpoint.\n";
+  const body = "# Plan\n\n1. Add the endpoint.\n2. Test the endpoint.\n";
   const runner: AgentSessionRunner = {
     run: async (prompt) => {
       const artifactId = /artifactId: "([^"]+)"/.exec(prompt)?.[1];
       assert.ok(artifactId);
-      return `---\nartifactId: ${JSON.stringify(artifactId)}\nrequirement: ${JSON.stringify(requirement)}\ncreatedAt: "2026-01-01T00:00:00.000Z"\ncontentHash: ${JSON.stringify(sha256(body.trim()))}\n---\n\n${body}`;
+      return `---\nartifactId: ${JSON.stringify(artifactId)}\nrequirement: ${JSON.stringify(requirement)}\ncreatedAt: "2026-01-01T00:00:00.000Z"\ncontentHash: "0000000000000000000000000000000000000000000000000000000000000000"\n---\n\n${body}`;
     },
   };
-  const planner = new Planner(runner, new SdlcStore(root), () => new Date("2026-01-01T00:00:00.000Z"));
+  const store = new SdlcStore(root);
+  const planner = new Planner(runner, store, () => new Date("2026-01-01T00:00:00.000Z"));
+
   const result = await planner.createPlan(requirement);
-  const state = await new SdlcStore(root).readWorkflowState();
-  assert.equal(state?.status, "awaiting_approval");
-  assert.equal(state?.artifactId, result.artifactId);
-  assert.equal((await readFile(join(root, ".sdlc", "artifacts", result.artifactId, "PLAN.md"), "utf8")).includes("contentHash"), true);
-  assert.equal((await planner.approvePlan()).status, "approved");
+  const state = await store.readWorkflowState();
+  assert.equal(result.status, "awaiting_initial_plan_approval");
+  assert.equal(state?.stage, "awaiting_initial_plan_approval");
+  assert.equal(state?.pendingPlanRevision?.artifactId, result.artifactId);
+  assert.equal(result.plan.data.implementationTasks.length, 2);
+  assert.equal(
+    (await readFile(join(root, ".sdlc", "plan", "revisions", result.artifactId, "PLAN.html"), "utf8")).includes(
+      "Add the endpoint.",
+    ),
+    true,
+  );
+  await assert.rejects(
+    planner.approvePlan({
+      artifactId: result.artifactId,
+      contentHash: "1111111111111111111111111111111111111111111111111111111111111111",
+    }),
+    /does not match/,
+  );
+  const approved = await planner.approvePlan({
+    artifactId: result.artifactId,
+    contentHash: result.plan.contentHash,
+  });
+  assert.equal(approved.stage, "implementing");
+  assert.equal(approved.activePlanRevision?.artifactId, result.artifactId);
+  assert.equal((await readFile(join(root, ".sdlc", "PLAN.html"), "utf8")).includes("Prompt History"), true);
 });
