@@ -29,6 +29,28 @@ function extractListItems(body: string): string[] {
     .filter(Boolean);
 }
 
+function extractSectionList(body: string, heading: string): string[] {
+  const lines = body.split("\n");
+  const normalizedHeading = heading.toLowerCase();
+  const values: string[] = [];
+  let capturing = false;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (/^#{1,6}\s+/.test(line)) {
+      const currentHeading = line.replace(/^#{1,6}\s+/, "").trim().toLowerCase();
+      capturing = currentHeading === normalizedHeading;
+      continue;
+    }
+    if (!capturing) continue;
+    if (/^([-*]|\d+\.)\s+/.test(line)) {
+      values.push(line.replace(/^([-*]|\d+\.)\s+/, "").trim());
+      continue;
+    }
+    if (line.length > 0) break;
+  }
+  return values;
+}
+
 function firstHeadingOrSentence(body: string): string {
   const line = body
     .split("\n")
@@ -79,11 +101,14 @@ export class Planner {
       summary: firstHeadingOrSentence(body),
       body,
       promptHistory: input.promptHistory,
-      acceptanceCriteria: extractListItems(body),
-      implementationTasks: extractListItems(body),
+      acceptanceCriteria: extractSectionList(body, "Acceptance Criteria"),
+      implementationTasks: extractSectionList(body, "Implementation Tasks"),
       risks: [],
       openDesignDecisions: [],
     };
+    if (planRevision.implementationTasks.length === 0) {
+      planRevision.implementationTasks = extractListItems(body);
+    }
     return this.store.writePlanRevision({
       workflowId: input.workflowId,
       iteration: input.iteration,

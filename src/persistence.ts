@@ -3,7 +3,7 @@
  * Immutable artifacts are stored in stable locations while workflow state is updated atomically
  * so stale reports and approvals can be detected before they are applied.
  */
-import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
   ArtifactEnvelope,
@@ -59,6 +59,24 @@ async function readJson<T>(path: string): Promise<T> {
 
 export class SdlcStore {
   public constructor(private readonly rootDirectory: string) {}
+
+  private async withWorkflowLock<T>(operation: () => Promise<T>): Promise<T> {
+    const lockPath = join(this.rootDirectory, ".sdlc", "workflow.lock");
+    await mkdir(dirname(lockPath), { recursive: true });
+    try {
+      await mkdir(lockPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+        throw new Error("Workflow state is being updated concurrently");
+      }
+      throw error;
+    }
+    try {
+      return await operation();
+    } finally {
+      await rm(lockPath, { recursive: true, force: true });
+    }
+  }
 
   private artifactEnvelope<T>(
     artifactId: string,
@@ -348,14 +366,16 @@ export class SdlcStore {
 
   public async writeWorkflowState(state: WorkflowState, expectedVersion?: number): Promise<void> {
     const nextState = workflowStateSchema.parse(state);
-    if (expectedVersion !== undefined) {
-      const current = await this.readWorkflowState();
-      if (!current) throw new Error("Workflow state does not exist");
-      if (current.version !== expectedVersion) {
-        throw new Error(`Workflow state version mismatch: expected ${expectedVersion}, received ${current.version}`);
+    await this.withWorkflowLock(async () => {
+      if (expectedVersion !== undefined) {
+        const current = await this.readWorkflowState();
+        if (!current) throw new Error("Workflow state does not exist");
+        if (current.version !== expectedVersion) {
+          throw new Error(`Workflow state version mismatch: expected ${expectedVersion}, received ${current.version}`);
+        }
       }
-    }
-    await atomicWrite(join(this.rootDirectory, ".sdlc", "workflow.json"), `${stableSerialize(nextState)}\n`);
+      await atomicWrite(join(this.rootDirectory, ".sdlc", "workflow.json"), `${stableSerialize(nextState)}\n`);
+    });
   }
 
   public async readWorkflowState(): Promise<WorkflowState | undefined> {

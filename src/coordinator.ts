@@ -31,6 +31,12 @@ export class WorkflowCoordinator {
     return toReference(artifact);
   }
 
+  private assertMatchesReference(reference: ArtifactReference, artifact: ArtifactEnvelope<unknown>, label: string): void {
+    if (reference.artifactId !== artifact.artifactId || reference.contentHash !== artifact.contentHash) {
+      throw new Error(`${label} is stale for the current workflow state`);
+    }
+  }
+
   private nextState(state: WorkflowState, updates: Partial<WorkflowState>): WorkflowState {
     return {
       ...state,
@@ -289,6 +295,10 @@ export class WorkflowCoordinator {
     const qa = await this.store.readQaReport(state.iteration);
     const validation = await this.store.readValidationReport(state.iteration);
     const decision = await this.store.readHumanDecision(state.iteration);
+    this.assertMatchesReference(state.currentImplementation, implementation, "Implementation snapshot");
+    this.assertMatchesReference(state.latestQaReport, qa, "QA report");
+    this.assertMatchesReference(state.latestValidationReport, validation, "Validation report");
+    this.assertMatchesReference(state.latestHumanDecision, decision, "Human decision");
     const prompt = prompts.find((entry) => entry.sequence === implementation.data.promptSequence);
     if (!prompt) throw new Error("Implementation snapshot references a prompt that is no longer available");
     const report = this.documenter.createReport({
