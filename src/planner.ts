@@ -161,8 +161,7 @@ export class Planner {
       lastPromptSequence: 1,
       updatedAt: createdAt,
     };
-    await this.store.writeWorkflowState(state);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(state, undefined, {
       createdAt,
       workflowId,
       stage: state.stage,
@@ -197,8 +196,7 @@ export class Planner {
       pendingPlanRevision: undefined,
       updatedAt: this.now().toISOString(),
     };
-    await this.store.writeWorkflowState(approved, state.version);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(approved, state.version, {
       createdAt: approved.updatedAt,
       workflowId: approved.workflowId,
       stage: approved.stage,
@@ -239,8 +237,7 @@ export class Planner {
       },
       updatedAt: this.now().toISOString(),
     };
-    await this.store.writeWorkflowState(nextState, state.version);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(nextState, state.version, {
       createdAt: nextState.updatedAt,
       workflowId: state.workflowId,
       stage: nextState.stage,
@@ -270,8 +267,7 @@ export class Planner {
       stage: "awaiting_validation_decision",
       updatedAt: this.now().toISOString(),
     };
-    await this.store.writeWorkflowState(rejected, state.version);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(rejected, state.version, {
       createdAt: rejected.updatedAt,
       workflowId: rejected.workflowId,
       stage: rejected.stage,

@@ -359,12 +359,22 @@ export class SdlcStore {
   }
 
   public async appendEvent(event: Record<string, unknown>): Promise<void> {
+    await this.withWorkflowLock(async () => {
+      await this.appendEventUnlocked(event);
+    });
+  }
+
+  private async appendEventUnlocked(event: Record<string, unknown>): Promise<void> {
     const path = join(this.rootDirectory, ".sdlc", "events.jsonl");
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, `${stableSerialize(event)}\n`, { encoding: "utf8", flag: "a" });
   }
 
-  public async writeWorkflowState(state: WorkflowState, expectedVersion?: number): Promise<void> {
+  public async writeWorkflowState(
+    state: WorkflowState,
+    expectedVersion?: number,
+    event?: Record<string, unknown>,
+  ): Promise<void> {
     const nextState = workflowStateSchema.parse(state);
     await this.withWorkflowLock(async () => {
       if (expectedVersion !== undefined) {
@@ -375,6 +385,9 @@ export class SdlcStore {
         }
       }
       await atomicWrite(join(this.rootDirectory, ".sdlc", "workflow.json"), `${stableSerialize(nextState)}\n`);
+      if (event) {
+        await this.appendEventUnlocked(event);
+      }
     });
   }
 

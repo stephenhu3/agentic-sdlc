@@ -57,25 +57,25 @@ export class WorkflowCoordinator {
   public async appendHumanPrompt(content: string): Promise<PromptRecord> {
     const state = await this.store.readWorkflowState();
     if (!state) throw new Error("Workflow state not found");
+    const createdAt = this.now().toISOString();
     const prompt: PromptRecord = {
       sequence: state.lastPromptSequence + 1,
       content: content.trim(),
-      createdAt: this.now().toISOString(),
+      createdAt,
     };
-    await this.store.appendPrompt(prompt);
-    let activePlan = state.activePlanRevision;
-    if (activePlan) {
-      await this.store.projectCurrentPlan(await this.store.readPlanRevision(activePlan.artifactId), await this.store.listPrompts());
-    }
     const nextState = this.nextState(state, { lastPromptSequence: prompt.sequence });
-    await this.store.writeWorkflowState(nextState, state.version);
-    await this.store.appendEvent({
-      createdAt: prompt.createdAt,
+    await this.store.writeWorkflowState(nextState, state.version, {
+      createdAt,
       workflowId: nextState.workflowId,
       stage: nextState.stage,
       type: "prompt.appended",
       sequence: prompt.sequence,
     });
+    await this.store.appendPrompt(prompt);
+    const activePlan = nextState.activePlanRevision;
+    if (activePlan) {
+      await this.store.projectCurrentPlan(await this.store.readPlanRevision(activePlan.artifactId), await this.store.listPrompts());
+    }
     return prompt;
   }
 
@@ -99,8 +99,7 @@ export class WorkflowCoordinator {
       latestValidationReport: undefined,
       latestHumanDecision: undefined,
     });
-    await this.store.writeWorkflowState(nextState, state.version);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(nextState, state.version, {
       createdAt: nextState.updatedAt,
       workflowId: nextState.workflowId,
       stage: nextState.stage,
@@ -134,8 +133,7 @@ export class WorkflowCoordinator {
       latestValidationReport: undefined,
       latestHumanDecision: undefined,
     });
-    await this.store.writeWorkflowState(nextState, state.version);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(nextState, state.version, {
       createdAt: nextState.updatedAt,
       workflowId: nextState.workflowId,
       stage: nextState.stage,
@@ -180,8 +178,7 @@ export class WorkflowCoordinator {
       latestValidationReport: this.artifactReference(artifact),
       latestHumanDecision: undefined,
     });
-    await this.store.writeWorkflowState(nextState, state.version);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(nextState, state.version, {
       createdAt: nextState.updatedAt,
       workflowId: nextState.workflowId,
       stage: nextState.stage,
@@ -254,8 +251,7 @@ export class WorkflowCoordinator {
       stage: nextStage,
       latestHumanDecision: this.artifactReference(artifact),
     });
-    await this.store.writeWorkflowState(nextState, state.version);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(nextState, state.version, {
       createdAt: nextState.updatedAt,
       workflowId: nextState.workflowId,
       stage: nextState.stage,
@@ -291,10 +287,12 @@ export class WorkflowCoordinator {
     }
     if (state.stage !== "documenting") throw new Error("Workflow is not ready to document the iteration");
     const prompts = await this.store.listPrompts();
+    const plan = await this.store.readPlanRevision(state.activePlanRevision.artifactId);
     const implementation = await this.store.readImplementationSnapshot(state.iteration);
     const qa = await this.store.readQaReport(state.iteration);
     const validation = await this.store.readValidationReport(state.iteration);
     const decision = await this.store.readHumanDecision(state.iteration);
+    this.assertMatchesReference(state.activePlanRevision, plan, "Plan revision");
     this.assertMatchesReference(state.currentImplementation, implementation, "Implementation snapshot");
     this.assertMatchesReference(state.latestQaReport, qa, "QA report");
     this.assertMatchesReference(state.latestValidationReport, validation, "Validation report");
@@ -340,8 +338,7 @@ export class WorkflowCoordinator {
       latestHumanDecision: undefined,
       pendingPlanRevision: undefined,
     });
-    await this.store.writeWorkflowState(nextState, state.version);
-    await this.store.appendEvent({
+    await this.store.writeWorkflowState(nextState, state.version, {
       createdAt: nextState.updatedAt,
       workflowId: nextState.workflowId,
       stage: nextState.stage,

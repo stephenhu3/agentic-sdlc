@@ -141,6 +141,59 @@ test("validator cannot run before QA passes on the latest implementation snapsho
   );
 });
 
+test("validator rejects stale QA evidence after the implementation snapshot changes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "agentic-sdlc-workflow-"));
+  const { coordinator, store } = createPlanner(root);
+  const plan = await coordinator.startInitialPlan("Initial requirement");
+  await coordinator.approveCurrentPlan({ artifactId: plan.plan.artifactId, contentHash: plan.plan.contentHash });
+  await coordinator.recordImplementation({
+    summary: "Initial implementation",
+    changedFiles: [{ path: "src/index.ts", summary: "Added orchestration" }],
+  });
+  await coordinator.recordQaReport({
+    summary: "QA passed",
+    outcome: "passed",
+    testResults: [{ command: "npm test", outcome: "passed", output: "ok" }],
+  });
+
+  const state = await store.readWorkflowState();
+  assert.ok(state?.activePlanRevision);
+  assert.ok(state.latestQaReport);
+  const staleSnapshot = new Implementer().createSnapshot(state.activePlanRevision.artifactId, state.lastPromptSequence, {
+    summary: "A newer implementation without re-running QA",
+    changedFiles: [{ path: "src/index.ts", summary: "Changed behavior" }],
+  });
+  const staleArtifact = await store.writeImplementationSnapshot({
+    workflowId: state.workflowId,
+    iteration: state.iteration,
+    createdAt: "2026-01-01T00:20:00.000Z",
+    inputs: [state.activePlanRevision],
+    data: staleSnapshot,
+  });
+  await store.writeWorkflowState(
+    {
+      ...state,
+      version: state.version + 1,
+      currentImplementation: {
+        artifactId: staleArtifact.artifactId,
+        kind: staleArtifact.kind,
+        contentHash: staleArtifact.contentHash,
+        path: staleArtifact.path,
+      },
+      updatedAt: "2026-01-01T00:21:00.000Z",
+    },
+    state.version,
+  );
+
+  await assert.rejects(
+    coordinator.recordValidationReport({
+      summary: "Validation attempted with stale QA",
+      findings: [{ criterion: "Implement feature.", status: "passed", evidence: ["src/index.ts"], details: "done" }],
+    }),
+    /QA evidence is stale/,
+  );
+});
+
 test("plan revision candidates require explicit approval or rejection", async () => {
   const root = await mkdtemp(join(tmpdir(), "agentic-sdlc-workflow-"));
   const { coordinator } = createPlanner(root);
